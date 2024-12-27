@@ -1,6 +1,3 @@
 streamlit==1.39.0
-# works on macbook
-# ifcopenshell==0.8.0
-# linux version
-ifcopenshell-python==0.7.0a4
+ifcopenshell==0.8.0
 pandas==2.2.2
