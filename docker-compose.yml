@@ -1,0 +1,11 @@
+version: "3"
+services:
+  ifc-cube:
+    image: ifc-cube_image
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ifc-cube_container
+
+    volumes:
+      - .:/workspace:cached
