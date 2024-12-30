@@ -1,0 +1,2 @@
+If there are columns that always needs to be ignored, create file named "ignore_columns.txt" and add column names (each in new line).
+In same way you can create "ignore_rows.txt" for skipping rows which contains values in this file (in any column).

@@ -1,4 +1,5 @@
 import ifcopenshell.util.element as Element
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 import ifcopenshell
@@ -21,6 +22,28 @@ def generate_excel_download_link(df: pd.DataFrame, btn_name: str):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         return btn
+
+
+def get_ignore_lists(df):
+    path_to_ignore_c_list = Path("configs/ignore_columns.txt")
+
+    clean_ignore_column_list = []
+    if path_to_ignore_c_list.exists():
+        with open(path_to_ignore_c_list, "r") as f:
+            ignore_column_list = f.read().splitlines()
+
+        clean_ignore_column_list = [
+            col for col in ignore_column_list if col in df.columns
+        ]
+
+    path_to_ignore_r_list = Path("configs/ignore_rows.txt")
+
+    ignore_row_list = []
+    if path_to_ignore_r_list.exists():
+        with open(path_to_ignore_r_list, "r") as f:
+            ignore_row_list = f.read().splitlines()
+
+    return clean_ignore_column_list, ignore_row_list
 
 
 def get_objects_data_by_class(file: ifcopenshell.file, class_type: str):
@@ -79,7 +102,7 @@ def create_pandas_dataframe(data, pset_attributes):
     )
 
 
-def sidebar_opt(column_names: list):
+def sidebar_opt(column_names: list, ignore_list: list):
     ignore_columns = []
 
     st.sidebar.divider()
@@ -87,6 +110,8 @@ def sidebar_opt(column_names: list):
     st.sidebar.divider()
 
     for col_name in column_names:
+        if col_name in ignore_list:
+            continue
         if not st.sidebar.checkbox(col_name, value=chechk_all):
             ignore_columns.append(col_name)
 
@@ -100,10 +125,36 @@ def create_unique_count_df(dataframe: pd.DataFrame, column_name: str):
     return value_counts
 
 
+def compare_2_columns(df: pd.DataFrame):
+    col_a, col_b = st.columns(2)
+
+    column_1 = col_a.selectbox("Select column 1", df.columns)
+    column_2 = col_b.selectbox("Select column 2", df.columns, index=2)
+
+    if column_1 == column_2:
+        st.error("Select different columns")
+        st.stop()
+
+    comp_df = df[[column_1, column_2]]
+
+    return comp_df[comp_df[column_1] != comp_df[column_2]]
+
+
 def process_df(ifc):
     data, pset_attributes = get_objects_data_by_class(ifc, "IfcBuildingElement")
     df = create_pandas_dataframe(data, pset_attributes)
-    return df.drop(columns=sidebar_opt(df.columns)).reset_index(drop=True)
+
+    ignore_columns_list, ignore_row_list = get_ignore_lists(df)
+    ignore_columns = sidebar_opt(df.columns, ignore_columns_list)
+
+    clean_df = df[~df.isin(ignore_row_list).any(axis=1)]
+
+    clean_df.drop(columns=ignore_columns_list, inplace=True)
+
+    clean_df.drop(columns=ignore_columns, inplace=True)
+    clean_df.reset_index(drop=True, inplace=True)
+
+    return clean_df
 
 
 def run():
@@ -146,7 +197,21 @@ def run():
 
             count_of_details = create_unique_count_df(clean_df, count_data_column_name)
             st.dataframe(count_of_details)
+            total_details = count_of_details["Count"].sum()
+            st.write(f"Total details: {total_details}")
             generate_excel_download_link(count_of_details, "Download count as Excel")
+
+            # --- COMPARE 2 COLUMNS ---
+            st.divider()
+            st.header("Compare two columns")
+            column_comp_df = compare_2_columns(clean_df)
+            if column_comp_df.empty:
+                st.success("No difference between columns")
+            else:
+                st.dataframe(column_comp_df)
+                generate_excel_download_link(
+                    column_comp_df, "Download diff list as Excel"
+                )
 
             st.divider()
 
